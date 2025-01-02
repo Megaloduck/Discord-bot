@@ -61,7 +61,6 @@ async def member_count(ctx):
     member_count = guild.member_count  # Mendapatkan jumlah member di guild
     await ctx.send(f"Jumlah anggota di server ini: {member_count} anggota.")
 
-# Rules
 @bot.command()
 async def rules(ctx):
     embed = discord.Embed(
@@ -143,4 +142,80 @@ async def coinflip(ctx):
     # Send the embed with buttons
     await ctx.send(embed=embed, view=CoinFlipView())
 
+@bot.command()
+async def poll(ctx, question: str = None, *options: str):
+    if not question:
+        await ctx.send("Please provide a question for the poll.")
+        return
+    if len(options) < 2:
+        await ctx.send("Please provide at least two options for the poll.")
+        return
+
+    # Create the poll message
+    embed = discord.Embed(title="Poll", description=question, color=discord.Color.blue())
+    for i, option in enumerate(options, 1):
+        embed.add_field(name=f"Option {i}", value=option, inline=False)
+
+    poll_message = await ctx.send(embed=embed)
+
+    # Add reactions for the options
+    for i in range(len(options)):
+        await poll_message.add_reaction(chr(127462 + i))  # Unicode for A, B, C, etc.
+
+    # Inform the user
+    await ctx.send("Poll created! React with your vote.")
+
+@bot.command()
+async def endpoll(ctx, message_id: int):
+    try:
+        message = await ctx.fetch_message(message_id)
+        if message.author != bot.user:
+            await ctx.send("This message isn't a poll created by the bot.")
+            return
+
+        # Count reactions
+        reaction_counts = {reaction.emoji: reaction.count - 1 for reaction in message.reactions}  # Subtract bot's own reaction
+
+        result = "Poll Results:\n"
+        for emoji, count in reaction_counts.items():
+            result += f"{emoji}: {count} votes\n"
+
+        await ctx.send(result)
+
+    except discord.NotFound:
+        await ctx.send("Poll message not found!")
+    except discord.Forbidden:
+        await ctx.send("I don't have permission to fetch the message.")
+    except discord.HTTPException as e:
+        await ctx.send(f"An error occurred: {e}")
+
+@bot.command()
+async def setp(ctx):
+    # Create a dropdown menu (Select)
+    select = Select(
+        placeholder="Choose a channel type...",
+        options=[
+            discord.SelectOption(label="Voice Channel", description="Recommended for counters", value="voice"),
+            discord.SelectOption(label="Text Channel", value="text"),
+            discord.SelectOption(label="Announcement Channel", value="announcement"),
+            discord.SelectOption(label="Stage Channel", value="stage"),
+        ],
+    )
+
+    # Define a callback function for the dropdown
+    async def select_callback(interaction):
+        selected_value = select.values[0]
+        await interaction.response.send_message(f"You selected: {selected_value}", ephemeral=True)
+
+    select.callback = select_callback
+
+    # Create a View to hold the dropdown
+    view = View()
+    view.add_item(select)
+
+    # Send the dropdown menu
+    await ctx.send("Select the type of channel you want to use for the counters:", view=view)
+
+
 bot.run(TOKEN)
+
